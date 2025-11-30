@@ -13,7 +13,6 @@ export function clusterPositions(positions: number[], tolerance: number): number
     if (Math.abs(v - currentBandStart) <= tolerance) {
       currentBandValues.push(v);
     } else {
-      // finalize band as the average of its positions
       const center =
         currentBandValues.reduce((acc, n) => acc + n, 0) / currentBandValues.length;
       bands.push(center);
@@ -36,9 +35,7 @@ export function inferColumns(glyphs: Glyph[], xTolerance: number): number[] {
 }
 
 export function inferRows(glyphs: Glyph[], yTolerance: number): number[] {
-  // Use vertical centers
   const centers = glyphs.map(g => g.bbox.y + g.bbox.height / 2);
-  // PDF y increases upwards; for row indices we want descending order
   const bands = clusterPositions(centers, yTolerance);
   return bands.sort((a, b) => b - a); // top row first
 }

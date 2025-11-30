@@ -1,6 +1,6 @@
 import { readFileSync } from "fs";
 import path from "path";
-import { extractTablesFromPdf } from "../src";  // <— this is fine in TS
+import { PdfTableExtractor } from "../src";  // <— this is fine in TS
 
 async function main() {
   const filePath = process.argv[2];
@@ -15,7 +15,8 @@ async function main() {
   const buf = readFileSync(resolvedPath);
   const arrayBuffer = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
 
-  const tables = await extractTablesFromPdf(arrayBuffer, {
+  const extractor = new PdfTableExtractor();
+  const tables = await extractor.extractTables(arrayBuffer, {
     xTolerance: 4,
     yTolerance: 4,
   });
