@@ -33,15 +33,20 @@ export interface TableExtractionOptions {
   xTolerance?: number; // default: 3-5
   yTolerance?: number; // default: 3-5
 
-  // Optional hints — but *not* required
+  // Parsing preferences
+  decimalSeparator?: string; // default: "."
+
+  // Optional hints - but *not* required
   minColumnCount?: number; // default: 2
   maxColumnCount?: number; // default: 15
 }
 
+export type TableCellValue = string | number | undefined;
+
 export interface TableObjects {
   pageIndex: number;
   headers: string[];
-  rows: Array<Record<string, string>>;
+  rows: Array<Record<string, TableCellValue>>;
 }
 
 export interface PdfTableExtractorApi {

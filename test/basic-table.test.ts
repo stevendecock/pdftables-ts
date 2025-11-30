@@ -4,6 +4,7 @@ import { PdfTableExtractor } from "../src";
 
 const extractor = new PdfTableExtractor();
 const pdfPath = "test-data/Elegant-Indexes-aardgas.pdf";
+const decimalSeparator = ",";
 
 const expectedGrid = [
   ["PERIODE", "ZTP", "TTF20D101", "TTF101", "TTFDAMRLP"],
@@ -58,10 +59,17 @@ const expectedGrid = [
 
 const expectedObjects = (() => {
   const [headers, ...rows] = expectedGrid;
+  const numericColumnIndexes = new Set<number>([1, 2, 3, 4]);
+
   return rows.map(row => {
-    const obj: Record<string, string> = {};
+    const obj: Record<string, string | number | undefined> = {};
     headers.forEach((header, idx) => {
-      obj[header] = row[idx] ?? "";
+      const value = row[idx] ?? "";
+      if (numericColumnIndexes.has(idx)) {
+        obj[header] = value === "" ? undefined : Number(value.replace(decimalSeparator, "."));
+      } else {
+        obj[header] = value;
+      }
     });
     return obj;
   });
@@ -93,6 +101,7 @@ describe("Elegant-Indexes-aardgas.pdf", () => {
     const tables = await extractor.extractTablesAsObjects(loadPdfArrayBuffer(), {
       xTolerance: 4,
       yTolerance: 4,
+      decimalSeparator,
     });
 
     expect(tables).toHaveLength(1);

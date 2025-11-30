@@ -1,14 +1,21 @@
 {
-  "name": "pdf-table-extractor",
+  "name": "pdftables-ts",
   "version": "0.1.0",
   "description": "TypeScript library to extract tables from PDFs using glyph coordinates, preserving empty cells.",
-  "main": "dist/index.cjs",
-  "module": "dist/index.mjs",
-  "types": "dist/index.d.ts",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "require": "./dist/src/index.js",
+      "import": "./dist/src/index.js",
+      "types": "./dist/src/index.d.ts"
+    }
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest",
-    "run:pdf": "npm run build && node dist/test/manual-run.js"
+    "run:pdf": "npm run build && node dist/test/manual-run.js",
+    "prepublishOnly": "npm run build && npm test"
   },
   "keywords": [
     "pdf",
@@ -16,8 +23,21 @@
     "extract",
     "typescript"
   ],
-  "author": "Your Name",
+  "author": "Steven Decock",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/stevendecock/pdftables-ts.git"
+  },
+  "bugs": {
+    "url": "https://github.com/stevendecock/pdftables-ts/issues"
+  },
+  "homepage": "https://github.com/stevendecock/pdftables-ts#readme",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "dependencies": {
     "pdfjs-dist": "^4.0.0"
   },

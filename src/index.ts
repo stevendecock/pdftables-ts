@@ -5,6 +5,7 @@ import type {
   TableExtractionOptions,
   PdfTableExtractorApi,
   TableObjects,
+  TableCellValue,
 } from "./types";
 
 export * from "./types";
@@ -30,7 +31,7 @@ export class PdfTableExtractor implements PdfTableExtractorApi {
     options: TableExtractionOptions = {}
   ): Promise<TableObjects[]> {
     const tables = await this.extractTables(buffer, options);
-    return tables.map(tableToObjects);
+    return tables.map(table => tableToObjects(table, options));
   }
 }
 
@@ -113,21 +114,29 @@ function headersEqual(a: string[], b: string[]): boolean {
   return true;
 }
 
-function tableToObjects(table: ParsedTable): TableObjects {
+function tableToObjects(
+  table: ParsedTable,
+  options: TableExtractionOptions
+): TableObjects {
   if (table.rows.length === 0) {
     return { pageIndex: table.pageIndex, headers: [], rows: [] };
   }
 
+  const decimalSeparator = options.decimalSeparator ?? ".";
+
   const headerCells = table.rows[0].cells;
   const headerKeys = buildHeaderKeys(headerCells.map(cell => cell.text.trim()));
 
-  const rows = table.rows.slice(1).map(row => {
-    const record: Record<string, string> = {};
-    headerKeys.forEach((key, idx) => {
-      record[key] = row.cells[idx]?.text.trim() ?? "";
-    });
-    return record;
-  });
+  const bodyRows = table.rows.slice(1);
+  const columnValues = headerKeys.map((_, colIdx) =>
+    bodyRows.map(row => row.cells[colIdx]?.text.trim() ?? "")
+  );
+
+  const numericColumns = columnValues.map(values =>
+    isNumericColumn(values, decimalSeparator)
+  );
+
+  const rows = bodyRows.map(row => mapRowToObject(row, headerKeys, numericColumns, decimalSeparator));
 
   return {
     pageIndex: table.pageIndex,
@@ -140,9 +149,80 @@ function buildHeaderKeys(headers: string[]): string[] {
   const seen: Record<string, number> = {};
 
   return headers.map((header, idx) => {
-    const base = header === "" ? `column_${idx + 1}` : header;
+    const base = header === "" ? `column${idx + 1}` : header;
     const count = (seen[base] ?? 0) + 1;
     seen[base] = count;
     return count === 1 ? base : `${base}_${count}`;
   });
+}
+
+function mapRowToObject(
+  row: { cells: { text: string }[] },
+  headerKeys: string[],
+  numericColumns: boolean[],
+  decimalSeparator: string
+): Record<string, TableCellValue> {
+  const record: Record<string, TableCellValue> = {};
+
+  headerKeys.forEach((key, idx) => {
+    const raw = row.cells[idx]?.text.trim() ?? "";
+    if (numericColumns[idx]) {
+      const parsed = parseNumericValue(raw, decimalSeparator);
+      record[key] = parsed ?? undefined;
+    } else {
+      record[key] = raw;
+    }
+  });
+
+  return record;
+}
+
+function isNumericColumn(values: string[], decimalSeparator: string): boolean {
+  let sawNumeric = false;
+
+  const allNumeric = values.every(value => {
+    const trimmed = value.trim();
+    if (trimmed === "") return true;
+    const parsed = parseNumericValue(trimmed, decimalSeparator);
+    if (parsed === null) return false;
+    sawNumeric = true;
+    return true;
+  });
+
+  return allNumeric && sawNumeric;
+}
+
+function parseNumericValue(value: string, decimalSeparator: string): number | null {
+  if (value.trim() === "") return null;
+
+  const normalized = normalizeNumberString(value, decimalSeparator);
+  if (normalized === null) return null;
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeNumberString(value: string, decimalSeparator: string): string | null {
+  const separator = decimalSeparator || ".";
+  const escapedSeparator = escapeRegExp(separator);
+
+  let normalized = value.replace(/\s+/g, "");
+
+  if (separator !== ".") {
+    const thousandSeparator = separator === "," ? "." : ",";
+    const thousandPattern = new RegExp(
+      `\\${thousandSeparator}(?=\\d{3}(?:\\${thousandSeparator}|${escapedSeparator}|$))`,
+      "g"
+    );
+    normalized = normalized.replace(thousandPattern, "");
+    normalized = normalized.replace(new RegExp(escapedSeparator, "g"), ".");
+  } else {
+    normalized = normalized.replace(/,(?=\d{3}(\.|,|$))/g, "");
+  }
+
+  return normalized;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
