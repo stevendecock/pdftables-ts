@@ -1,0 +1,30 @@
+{
+  "name": "pdf-table-extractor",
+  "version": "0.1.0",
+  "description": "TypeScript library to extract tables from PDFs using glyph coordinates, preserving empty cells.",
+  "main": "dist/index.cjs",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest",
+    "run:pdf": "npm run build && node dist/test/manual-run.js"
+  },
+  "keywords": [
+    "pdf",
+    "table",
+    "extract",
+    "typescript"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "pdfjs-dist": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.0",
+    "vitest": "^2.0.0"
+  }
+}
