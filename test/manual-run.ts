@@ -13,13 +13,16 @@ async function main() {
   console.log(`Reading PDF: ${resolvedPath}`);
 
   const buf = readFileSync(resolvedPath);
-  const arrayBuffer = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+  // pdfjs detaches the ArrayBuffer during parsing, so create a fresh copy for each call.
+  const makeArrayBuffer = () => Uint8Array.from(buf).buffer;
 
   const extractor = new PdfTableExtractor();
-  const tables = await extractor.extractTables(arrayBuffer, {
+  const options = {
     xTolerance: 4,
     yTolerance: 4,
-  });
+  };
+
+  const tables = await extractor.extractTables(makeArrayBuffer(), options);
 
   if (tables.length === 0) {
     console.log("No tables found (or no glyphs).");
@@ -39,6 +42,19 @@ async function main() {
         .join(" | ");
       console.log(line);
     }
+  }
+
+  const objectTables = await extractor.extractTablesAsObjects(makeArrayBuffer(), {
+    ...options,
+    decimalSeparator: ",",
+  });
+
+  console.log("\n\n--- Structured objects ---");
+  for (const table of objectTables) {
+    console.log(`\n=== Page ${table.pageIndex} ===`);
+    console.log("Headers:", table.headers);
+    console.log("Rows:");
+    console.dir(table.rows, { depth: null });
   }
 }
 

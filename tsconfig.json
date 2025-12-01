@@ -10,5 +10,5 @@
     "esModuleInterop": true,
     "skipLibCheck": true
   },
-  "include": ["src/**/*", "test/manual-run.ts"]
+  "include": ["src/**/*", "test/manual-run.ts", "test/list-glyphs.ts"]
 }

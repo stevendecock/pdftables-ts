@@ -36,6 +36,14 @@ export interface TableExtractionOptions {
   // Parsing preferences
   decimalSeparator?: string; // default: "."
 
+  // Optional explicit column headers to guide detection.
+  // Each string is matched to glyph text (trimmed). Newlines split into multiple glyphs that are combined.
+  // When provided, the detector will attempt a header-guided extraction first before falling back.
+  columnHeaders?: string[];
+
+  // Optional vertical whitespace (in PDF units) that signals the table ended when a larger gap is found.
+  endOfTableWhitespace?: number;
+
   // Optional hints - but *not* required
   minColumnCount?: number; // default: 2
   maxColumnCount?: number; // default: 15

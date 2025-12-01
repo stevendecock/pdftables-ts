@@ -124,10 +124,12 @@ function tableToObjects(
 
   const decimalSeparator = options.decimalSeparator ?? ".";
 
-  const headerCells = table.rows[0].cells;
-  const headerKeys = buildHeaderKeys(headerCells.map(cell => cell.text.trim()));
+  const headerRowCount = countHeaderRows(table.rows, decimalSeparator);
+  const headerRows = table.rows.slice(0, headerRowCount);
+  const bodyRows = table.rows.slice(headerRowCount);
 
-  const bodyRows = table.rows.slice(1);
+  const mergedHeaders = mergeHeaderRows(headerRows);
+  const headerKeys = buildHeaderKeys(mergedHeaders);
   const columnValues = headerKeys.map((_, colIdx) =>
     bodyRows.map(row => row.cells[colIdx]?.text.trim() ?? "")
   );
@@ -143,6 +145,54 @@ function tableToObjects(
     headers: headerKeys,
     rows,
   };
+}
+
+function countHeaderRows(rows: { cells: { text: string }[] }[], decimalSeparator: string): number {
+  if (rows.length === 0) return 0;
+
+  let headerCount = 0;
+  for (const row of rows) {
+    if (isLikelyDataRow(row, decimalSeparator)) break;
+    headerCount++;
+  }
+
+  return Math.max(1, Math.min(headerCount, rows.length));
+}
+
+function mergeHeaderRows(rows: { cells: { text: string }[] }[]): string[] {
+  if (rows.length === 0) return [];
+  const colCount = rows[0].cells.length;
+
+  const merged: string[] = [];
+  for (let col = 0; col < colCount; col++) {
+    const parts = rows
+      .map(r => r.cells[col]?.text.trim() ?? "")
+      .filter(text => text !== "");
+    const combined = parts.join(" ").replace(/\s+/g, " ").trim();
+    merged.push(combined);
+  }
+
+  return merged;
+}
+
+function isLikelyDataRow(row: { cells: { text: string }[] }, decimalSeparator: string): boolean {
+  const values = row.cells.map(cell => cell.text.trim()).filter(text => text !== "");
+  if (values.length === 0) return false;
+
+  let numericish = 0;
+  for (const value of values) {
+    if (isDateLike(value) || parseNumericValue(value, decimalSeparator) !== null) {
+      numericish++;
+    }
+  }
+
+  const threshold = Math.max(2, Math.ceil(values.length * 0.5));
+  return numericish >= threshold;
+}
+
+function isDateLike(value: string): boolean {
+  const trimmed = value.trim();
+  return /^\d{4}-\d{2}$/.test(trimmed);
 }
 
 function buildHeaderKeys(headers: string[]): string[] {

@@ -13,8 +13,9 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "vitest",
+    "test": "vitest run",
     "run:pdf": "npm run build && node dist/test/manual-run.js",
+    "run:glyphs": "npm run build && node dist/test/list-glyphs.js",
     "prepublishOnly": "npm run build && npm test"
   },
   "keywords": [

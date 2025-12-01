@@ -26,6 +26,18 @@ const extractor = new PdfTableExtractor();
 const tables = await extractor.extractTables(arrayBuffer, {
   xTolerance: 4,
   yTolerance: 4,
+  // Optional: anchor detection to explicit headers (newlines are collapsed to spaces).
+  columnHeaders: [
+    "PERIODE",
+    "BELPEX",
+    "BELPEX RLP\n/\nBELPEX S21",
+    "ENDEX20D101",
+    "ENDEX101",
+    "EPEXDAMREK",
+    "EPEXDAMRLP",
+  ],
+  // Optional: stop when a larger vertical gap is found below the last row (PDF units).
+  endOfTableWhitespace: 12,
 });
 
 for (const table of tables) {
@@ -51,6 +63,8 @@ console.log(tables[0]?.rows[0]);  // { Header A: '...', Header B: 12.34 }
 - `xTolerance` (default `3`): tolerance in PDF units when grouping glyphs into columns.
 - `yTolerance` (default `3`): tolerance in PDF units when grouping glyphs into rows.
 - `decimalSeparator` (default `"."`): decimal separator to use when parsing numeric columns in `extractTablesAsObjects`.
+- `columnHeaders` (optional `string[]`): when provided, the detector first tries to locate these headers (newlines inside labels are treated as spaces) and anchor columns to them, falling back to auto-detection if they cannot be matched.
+- `endOfTableWhitespace` (optional `number`, default `Infinity`): when guiding by headers, stop parsing if a vertical gap larger than this is found below the last parsed row.
 - `minColumnCount` (default `2`): lower bound when inferring column count.
 - `maxColumnCount` (default `15`): upper bound when inferring column count.
 

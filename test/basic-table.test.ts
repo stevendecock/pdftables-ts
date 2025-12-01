@@ -3,10 +3,11 @@ import { readFileSync } from "fs";
 import { PdfTableExtractor } from "../src";
 
 const extractor = new PdfTableExtractor();
-const pdfPath = "test-data/Elegant-Indexes-aardgas.pdf";
+const pdfPath_aardgas = "test-data/Elegant-Indexes-aardgas.pdf";
+const pdfPath_elektriciteit = "test-data/Elegant-Indexes-elektriciteit.pdf";
 const decimalSeparator = ",";
 
-const expectedGrid = [
+const expectedGrid_Aardgas = [
   ["PERIODE", "ZTP", "TTF20D101", "TTF101", "TTFDAMRLP"],
   ["2022-01", "83,29", "", "116,82", "83,42"],
   ["2022-02", "80,06", "", "85,21", "79,72"],
@@ -58,7 +59,7 @@ const expectedGrid = [
 ];
 
 const expectedObjects = (() => {
-  const [headers, ...rows] = expectedGrid;
+  const [headers, ...rows] = expectedGrid_Aardgas;
   const numericColumnIndexes = new Set<number>([1, 2, 3, 4]);
 
   return rows.map(row => {
@@ -75,14 +76,14 @@ const expectedObjects = (() => {
   });
 })();
 
-function loadPdfArrayBuffer(): ArrayBuffer {
+function loadPdfArrayBuffer(pdfPath: string): ArrayBuffer {
   const buf = readFileSync(pdfPath);
   return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
 }
 
 describe("Elegant-Indexes-aardgas.pdf", () => {
   it("extracts the structured table grid", async () => {
-    const tables = await extractor.extractTables(loadPdfArrayBuffer(), {
+    const tables = await extractor.extractTables(loadPdfArrayBuffer(pdfPath_aardgas), {
       xTolerance: 4,
       yTolerance: 4,
     });
@@ -90,15 +91,15 @@ describe("Elegant-Indexes-aardgas.pdf", () => {
     expect(tables).toHaveLength(1);
     const [table] = tables;
 
-    expect(table.rows.length).toBe(expectedGrid.length);
-    expect(table.rows[0]?.cells.length).toBe(expectedGrid[0].length);
+    expect(table.rows.length).toBe(expectedGrid_Aardgas.length);
+    expect(table.rows[0]?.cells.length).toBe(expectedGrid_Aardgas[0].length);
 
     const grid = table.rows.map(row => row.cells.map(cell => cell.text.trim()));
-    expect(grid).toEqual(expectedGrid);
+    expect(grid).toEqual(expectedGrid_Aardgas);
   });
 
   it("maps rows to objects using headers as keys", async () => {
-    const tables = await extractor.extractTablesAsObjects(loadPdfArrayBuffer(), {
+    const tables = await extractor.extractTablesAsObjects(loadPdfArrayBuffer(pdfPath_aardgas), {
       xTolerance: 4,
       yTolerance: 4,
       decimalSeparator,
@@ -107,7 +108,69 @@ describe("Elegant-Indexes-aardgas.pdf", () => {
     expect(tables).toHaveLength(1);
     const [table] = tables;
 
-    expect(table.headers).toEqual(expectedGrid[0]);
+    expect(table.headers).toEqual(expectedGrid_Aardgas[0]);
     expect(table.rows).toEqual(expectedObjects);
+  });
+});
+
+describe("Elegant-Indexes-elektriciteit.pdf", () => {
+  it("parses the electricity index table as objects", async () => {
+    const tables = await extractor.extractTablesAsObjects(
+      loadPdfArrayBuffer(pdfPath_elektriciteit),
+      {
+        xTolerance: 4,
+        yTolerance: 4,
+        decimalSeparator,
+      }
+    );
+
+    expect(tables).toHaveLength(1);
+    const [table] = tables;
+
+    expect(table.headers.length).toBe(7);
+    expect(table.rows).toHaveLength(47);
+
+    expect(table.rows[0]?.ENDEX101).toBeCloseTo(295.7);
+  });
+
+  it("parses the electricity index table when guided by provided headers", async () => {
+    const tables = await extractor.extractTablesAsObjects(
+      loadPdfArrayBuffer(pdfPath_elektriciteit),
+      {
+        xTolerance: 4,
+        yTolerance: 4,
+        decimalSeparator,
+        columnHeaders: [
+          "PERIODE",
+          "BELPEX",
+          "BELPEX RLP\n/\nBELPEX S21",
+          "ENDEX20D101",
+          "ENDEX101",
+          "EPEXDAMREK",
+          "EPEXDAMRLP",
+        ],
+      }
+    );
+
+    expect(tables).toHaveLength(1);
+    const [table] = tables;
+
+    console.log("Guided headers:", table.headers);
+    console.log("Guided rows count:", table.rows.length);
+    console.log("Guided first 3 rows:", table.rows.slice(0, 3));
+    console.log("Guided last row:", table.rows[table.rows.length - 1]);
+
+    expect(table.headers).toEqual([
+      "PERIODE",
+      "BELPEX",
+      "BELPEX RLP / BELPEX S21",
+      "ENDEX20D101",
+      "ENDEX101",
+      "EPEXDAMREK",
+      "EPEXDAMRLP",
+    ]);
+
+    expect(table.headers.length).toBe(7);
+    expect(table.rows).toHaveLength(47);
   });
 });
