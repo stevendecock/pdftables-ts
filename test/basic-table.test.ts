@@ -5,6 +5,7 @@ import { PdfTableExtractor } from "../src";
 const extractor = new PdfTableExtractor();
 const pdfPath_aardgas = "test-data/Elegant-Indexes-aardgas.pdf";
 const pdfPath_elektriciteit = "test-data/Elegant-Indexes-elektriciteit.pdf";
+const pdfPath_electricity_quotations = "test-data/ElectricityQuotations-NL.pdf";
 const decimalSeparator = ",";
 
 const expectedGrid_Aardgas = [
@@ -172,5 +173,40 @@ describe("Elegant-Indexes-elektriciteit.pdf", () => {
 
     expect(table.headers.length).toBe(7);
     expect(table.rows).toHaveLength(47);
+  });
+});
+
+describe("ElectricityQuotations-NL.pdf", () => {
+  it("parses the electricity quotations table when guided by provided headers", async () => {
+    const tables = await extractor.extractTablesAsObjects(
+      loadPdfArrayBuffer(pdfPath_electricity_quotations),
+      {
+        xTolerance: 4,
+        yTolerance: 4,
+        decimalSeparator,
+        columnHeaders: [
+          "Maand",
+          "Endex\n101\n(€/MWh)",
+          "Endex\n103\n(€/MWh)",
+        ],
+      }
+    );
+
+    expect(tables).toHaveLength(1);
+    const [table] = tables;
+
+    console.log("Guided headers:", table.headers);
+    console.log("Guided rows count:", table.rows.length);
+    console.log("Guided first 3 rows:", table.rows.slice(0, 3));
+    console.log("Guided last row:", table.rows[table.rows.length - 1]);
+
+    expect(table.headers).toEqual([
+      "Maand",
+      "Endex101(€/MWh)",
+      "Endex103(€/MWh)",
+    ]);
+
+    expect(table.headers.length).toBe(3);
+    expect(table.rows).toHaveLength(48);
   });
 });

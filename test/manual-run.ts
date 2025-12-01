@@ -20,6 +20,11 @@ async function main() {
   const options = {
     xTolerance: 4,
     yTolerance: 4,
+    columnHeaders: [
+          "Maand",
+          "Endex\n101\n(€/MWh)",
+          "Endex\n103\n(€/MWh)",
+        ],
   };
 
   const tables = await extractor.extractTables(makeArrayBuffer(), options);

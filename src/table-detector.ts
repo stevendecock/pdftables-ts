@@ -555,11 +555,12 @@ function extractTableWithHeaders(
   const headers = options.columnHeaders ?? [];
   if (headers.length === 0) return null;
 
-  const sortedGlyphs = [...nonSpaceGlyphs].sort((a, b) => {
-    const dx = a.bbox.x - b.bbox.x;
-    if (Math.abs(dx) > 0.001) return dx;
-    return a.bbox.y - b.bbox.y;
-  });
+  // const sortedGlyphs = [...nonSpaceGlyphs].sort((a, b) => {
+  //   const dx = a.bbox.x - b.bbox.x;
+  //   if (Math.abs(dx) > 0.001) return dx;
+  //   return -1 * (a.bbox.y - b.bbox.y);
+  // });
+  const sortedGlyphs = [...nonSpaceGlyphs];
 
   const used = new Set<Glyph>();
   const headerCells: { title: string; bbox: Rect }[] = [];
