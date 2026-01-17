@@ -13,6 +13,10 @@ TypeScript library to extract table structures from PDFs using glyph coordinates
 npm install pdftables-ts
 ```
 `pdfjs-dist` is included as a dependency.
+This package ships ESM-only. If you are in CommonJS, use dynamic `import()` (or switch to ESM).
+```js
+const { PdfTableExtractor } = await import("pdftables-ts");
+```
 
 ## Quick start
 ```ts

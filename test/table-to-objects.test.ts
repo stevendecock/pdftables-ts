@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PdfTableExtractor, ParsedTable, TableExtractionOptions } from "../src";
+import { PdfTableExtractor, ParsedTable, TableExtractionOptions } from "../src/index.js";
 
 class StubExtractor extends PdfTableExtractor {
   constructor(private readonly tables: ParsedTable[]) {

@@ -1,4 +1,4 @@
-import type { Glyph } from "./types";
+import type { Glyph } from "./types.js";
 
 export function clusterPositions(positions: number[], tolerance: number): number[] {
   if (positions.length === 0) return [];

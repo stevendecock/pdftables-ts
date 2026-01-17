@@ -1,6 +1,6 @@
 import { readFileSync } from "fs";
 import path from "path";
-import { loadGlyphsFromPdf } from "../src/pdf-loader";
+import { loadGlyphsFromPdf } from "../src/pdf-loader.js";
 
 function fmt(n: number): string {
   return n.toFixed(2).padStart(8, " ");

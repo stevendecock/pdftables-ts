@@ -1,14 +1,14 @@
-import { loadGlyphsFromPdf } from "./pdf-loader";
-import { extractTableFromGlyphs } from "./table-detector";
+import { loadGlyphsFromPdf } from "./pdf-loader.js";
+import { extractTableFromGlyphs } from "./table-detector.js";
 import type {
   ParsedTable,
   TableExtractionOptions,
   PdfTableExtractorApi,
   TableObjects,
   TableCellValue,
-} from "./types";
+} from "./types.js";
 
-export * from "./types";
+export * from "./types.js";
 
 export class PdfTableExtractor implements PdfTableExtractorApi {
   async extractTables(

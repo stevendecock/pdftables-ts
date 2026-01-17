@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "fs";
-import { PdfTableExtractor } from "../src";
+import { PdfTableExtractor } from "../src/index.js";
 
 const extractor = new PdfTableExtractor();
 const pdfPath_aardgas = "test-data/Elegant-Indexes-aardgas.pdf";

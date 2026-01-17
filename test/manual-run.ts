@@ -1,6 +1,6 @@
 import { readFileSync } from "fs";
 import path from "path";
-import { PdfTableExtractor } from "../src";  // <— this is fine in TS
+import { PdfTableExtractor } from "../src/index.js";  // <— this is fine in TS
 
 async function main() {
   const filePath = process.argv[2];

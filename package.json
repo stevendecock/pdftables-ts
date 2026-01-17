@@ -2,11 +2,11 @@
   "name": "pdftables-ts",
   "version": "0.2.1",
   "description": "TypeScript library to extract tables from PDFs using glyph coordinates, preserving empty cells.",
+  "type": "module",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
   "exports": {
     ".": {
-      "require": "./dist/src/index.js",
       "import": "./dist/src/index.js",
       "types": "./dist/src/index.d.ts"
     }

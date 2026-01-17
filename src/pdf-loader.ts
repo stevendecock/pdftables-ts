@@ -1,5 +1,5 @@
 import * as pdfjs from "pdfjs-dist";
-import type { Glyph, Rect } from "./types";
+import type { Glyph, Rect } from "./types.js";
 
 // For Node: disable workers
 // @ts-ignore

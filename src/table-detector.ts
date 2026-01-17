@@ -5,8 +5,8 @@ import type {
   TableRow,
   Rect,
   TableExtractionOptions,
-} from "./types";
-import { inferRows, clusterPositions } from "./geometry";
+} from "./types.js";
+import { inferRows, clusterPositions } from "./geometry.js";
 
 /**
  * Assign a 1D value to the nearest center index.
