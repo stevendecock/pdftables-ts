@@ -6,6 +6,7 @@ const extractor = new PdfTableExtractor();
 const pdfPath_aardgas = "test-data/Elegant-Indexes-aardgas.pdf";
 const pdfPath_elektriciteit = "test-data/Elegant-Indexes-elektriciteit.pdf";
 const pdfPath_electricity_quotations = "test-data/ElectricityQuotations-NL.pdf";
+const pdfPath_engie_easy_vast = "test-data/Engie_EASY_Vast.pdf";
 const decimalSeparator = ",";
 
 const expectedGrid_Aardgas = [
@@ -208,5 +209,52 @@ describe("ElectricityQuotations-NL.pdf", () => {
 
     expect(table.headers.length).toBe(3);
     expect(table.rows).toHaveLength(48);
+  });
+});
+
+describe("Engie_EASY_Vast.pdf", () => {
+  it("extracts the Type gebruik price table from page 0", async () => {
+    const tables = await extractor.extractTablesAsObjects(
+        loadPdfArrayBuffer(pdfPath_engie_easy_vast), 
+        {
+          xTolerance: 4,
+          yTolerance: 4,
+          endOfTableWhitespace: 20,
+          decimalSeparator: ",",
+          columnHeaders: [
+            "Type gebruik",
+            "Enkelvoudig",
+            "Tweevoudig\nPiekuren",
+            "Tweevoudig\nDaluren",
+            "Uitsluitend\nNacht",
+          ]
+        }
+      );
+
+    const page0Table = tables.find(table => table.pageIndex === 0);
+    expect(page0Table).toBeTruthy();
+
+    expect(page0Table?.headers).toEqual([
+      "Type gebruik",
+      "Enkelvoudig",
+      "TweevoudigPiekuren",
+      "TweevoudigDaluren",
+      "UitsluitendNacht",
+    ]);
+
+    expect(page0Table?.rows).toHaveLength(2);
+
+    const [afnameRow, injectieRow] = page0Table?.rows ?? [];
+    expect(afnameRow?.["Type gebruik"]).toBe("Afname(2)");
+    expect(afnameRow?.Enkelvoudig).toBeCloseTo(14.614);
+    expect(afnameRow?.TweevoudigPiekuren).toBeCloseTo(15.557);
+    expect(afnameRow?.TweevoudigDaluren).toBeCloseTo(12.81);
+    expect(afnameRow?.UitsluitendNacht).toBeCloseTo(12.81);
+
+    expect(injectieRow?.["Type gebruik"]).toBe("Injectie(3)");
+    expect(injectieRow?.Enkelvoudig).toBeCloseTo(1.47);
+    expect(injectieRow?.TweevoudigPiekuren).toBeCloseTo(1.47);
+    expect(injectieRow?.TweevoudigDaluren).toBeCloseTo(1.47);
+    expect(injectieRow?.UitsluitendNacht).toBeUndefined();
   });
 });
