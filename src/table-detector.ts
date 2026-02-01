@@ -1,5 +1,5 @@
 import type {
-  Glyph,
+  TextItem,
   ParsedTable,
   TableCell,
   TableRow,
@@ -25,11 +25,11 @@ function findNearestIndex(value: number, centers: number[]): number {
   return bestIndex;
 }
 
-function bboxFromGlyphs(glyphs: Glyph[]): Rect {
-  const xMin = Math.min(...glyphs.map(g => g.bbox.x));
-  const xMax = Math.max(...glyphs.map(g => g.bbox.x + g.bbox.width));
-  const yMin = Math.min(...glyphs.map(g => g.bbox.y));
-  const yMax = Math.max(...glyphs.map(g => g.bbox.y + g.bbox.height));
+function bboxFromTextItems(items: TextItem[]): Rect {
+  const xMin = Math.min(...items.map(g => g.bbox.x));
+  const xMax = Math.max(...items.map(g => g.bbox.x + g.bbox.width));
+  const yMin = Math.min(...items.map(g => g.bbox.y));
+  const yMax = Math.max(...items.map(g => g.bbox.y + g.bbox.height));
   return {
     x: xMin,
     y: yMin,
@@ -98,17 +98,17 @@ function reclusterCenters1D(values: number[], k: number): number[] {
  * Lower score = better.
  */
 function scoreColumnModel(
-  glyphs: Glyph[],
+  items: TextItem[],
   rowCenters: number[],
   columnCenters: number[]
 ): number {
   const numCols = columnCenters.length;
   if (numCols === 0) return Number.POSITIVE_INFINITY;
-  if (glyphs.length === 0) return Number.POSITIVE_INFINITY;
+  if (items.length === 0) return Number.POSITIVE_INFINITY;
 
-  const totalGlyphs = glyphs.length;
+  const totalTextItems = items.length;
 
-  const colGlyphCounts = new Array<number>(numCols).fill(0);
+  const colTextItemCounts = new Array<number>(numCols).fill(0);
   const colSquaredDistances = new Array<number>(numCols).fill(0);
 
   const rowUsedCols: Array<Set<number>> =
@@ -116,12 +116,12 @@ function scoreColumnModel(
       ? Array.from({ length: rowCenters.length }, () => new Set<number>())
       : [];
 
-  for (const glyph of glyphs) {
-    const cx = glyph.bbox.x + glyph.bbox.width / 2;
-    const cy = glyph.bbox.y + glyph.bbox.height / 2;
+  for (const item of items) {
+    const cx = item.bbox.x + item.bbox.width / 2;
+    const cy = item.bbox.y + item.bbox.height / 2;
 
     const colIndex = findNearestIndex(cx, columnCenters);
-    colGlyphCounts[colIndex]++;
+    colTextItemCounts[colIndex]++;
 
     const dist = cx - columnCenters[colIndex];
     colSquaredDistances[colIndex] += dist * dist;
@@ -134,11 +134,11 @@ function scoreColumnModel(
 
   // 1) Compactness: average squared distance within columns
   const totalSquared = colSquaredDistances.reduce((sum, v) => sum + v, 0);
-  const compactness = totalSquared / totalGlyphs; // units^2
+  const compactness = totalSquared / totalTextItems; // units^2
 
-  // 2) Empty columns: columns that have very few glyphs
-  const minPerCol = Math.max(2, Math.floor(totalGlyphs * 0.01)); // at least 1% of glyphs or 2
-  const emptyCols = colGlyphCounts.filter(c => c < minPerCol).length;
+  // 2) Empty columns: columns that have very few items
+  const minPerCol = Math.max(2, Math.floor(totalTextItems * 0.01)); // at least 1% of items or 2
+  const emptyCols = colTextItemCounts.filter(c => c < minPerCol).length;
 
   // 3) Row consistency: variance of "used column count per row"
   let rowVariance = 0;
@@ -173,15 +173,15 @@ function scoreColumnModel(
  *  - pick the K that gives the best score.
  */
 function inferColumnsSmart(
-  glyphs: Glyph[],
+  items: TextItem[],
   rowCenters: number[],
   xTolerance: number,
   minCols: number,
   maxCols: number
 ): number[] {
-  if (glyphs.length === 0) return [];
+  if (items.length === 0) return [];
 
-  const centersAll: number[] = glyphs.map(g => g.bbox.x + g.bbox.width / 2);
+  const centersAll: number[] = items.map(g => g.bbox.x + g.bbox.width / 2);
 
   // First collapse obvious duplicates / micro-jitter into pre-bands.
   const candidateCenters = clusterPositions(centersAll, xTolerance);
@@ -200,7 +200,7 @@ function inferColumnsSmart(
 
   for (let k = minK; k <= maxK; k++) {
     const centersK = reclusterCenters1D(candidateCenters, k);
-    const score = scoreColumnModel(glyphs, rowCenters, centersK);
+    const score = scoreColumnModel(items, rowCenters, centersK);
 
     if (score < bestScore) {
       bestScore = score;
@@ -212,19 +212,19 @@ function inferColumnsSmart(
 }
 
 /**
- * Main per-page extractor: given all glyphs on a page, infer a table grid and return rows/cells.
+ * Main per-page extractor: given all items on a page, infer a table grid and return rows/cells.
  * This still assumes "this region is a table", but internally chooses the column count K.
  */
-export function extractTableFromGlyphs(
+export function extractTableFromTextItems(
   pageIndex: number,
-  glyphs: Glyph[],
+  items: TextItem[],
   options: TableExtractionOptions = {}
 ): ParsedTable | null {
-  if (glyphs.length === 0) return null;
+  if (items.length === 0) return null;
 
   // Prefer header-guided extraction when headers are provided.
   if (options.columnHeaders && options.columnHeaders.length > 0) {
-    const guided = extractTableWithHeaders(pageIndex, glyphs, options);
+    const guided = extractTableWithHeaders(pageIndex, items, options);
     if (guided) return guided;
   }
 
@@ -235,14 +235,14 @@ export function extractTableFromGlyphs(
   const maxCols = options.maxColumnCount ?? 15;
 
   // 1) Infer rows first (vertical bands)
-  const rowCenters = inferRows(glyphs, yTolerance);
+  const rowCenters = inferRows(items, yTolerance);
   if (rowCenters.length === 0) {
     return null; // no grid-like structure
   }
 
   // 2) Infer columns using model selection over K
   const columnCenters = inferColumnsSmart(
-    glyphs,
+    items,
     rowCenters,
     xTolerance,
     minCols,
@@ -252,20 +252,20 @@ export function extractTableFromGlyphs(
     return null;
   }
 
-  // 3) Allocate buckets [row][col] to collect glyphs
-  const buckets: { glyphs: Glyph[] }[][] = [];
+  // 3) Allocate buckets [row][col] to collect items
+  const buckets: { items: TextItem[] }[][] = [];
   for (let r = 0; r < rowCenters.length; r++) {
-    const row: { glyphs: Glyph[] }[] = [];
+    const row: { items: TextItem[] }[] = [];
     for (let c = 0; c < columnCenters.length; c++) {
-      row.push({ glyphs: [] });
+      row.push({ items: [] });
     }
     buckets.push(row);
   }
 
-  // 4) Assign each glyph to a (row, col) cell
-  for (const glyph of glyphs) {
-    const cx = glyph.bbox.x + glyph.bbox.width / 2;
-    const cy = glyph.bbox.y + glyph.bbox.height / 2;
+  // 4) Assign each item to a (row, col) cell
+  for (const item of items) {
+    const cx = item.bbox.x + item.bbox.width / 2;
+    const cy = item.bbox.y + item.bbox.height / 2;
 
     const colIndex = findNearestIndex(cx, columnCenters);
     const rowIndex = findNearestIndex(cy, rowCenters);
@@ -276,7 +276,7 @@ export function extractTableFromGlyphs(
       colIndex >= 0 &&
       colIndex < buckets[rowIndex].length
     ) {
-      buckets[rowIndex][colIndex].glyphs.push(glyph);
+      buckets[rowIndex][colIndex].items.push(item);
     }
   }
 
@@ -308,7 +308,7 @@ export function extractTableFromGlyphs(
     colIndicesToUse.forEach((colIdx, logicalIdx) => {
       const bucket = buckets[r][colIdx];
 
-      if (bucket.glyphs.length === 0) {
+      if (bucket.items.length === 0) {
         cells.push({
           rowIndex: r,
           columnIndex: logicalIdx,
@@ -316,13 +316,13 @@ export function extractTableFromGlyphs(
           bbox: null,
         });
       } else {
-        const text = bucket.glyphs
+        const text = bucket.items
           .slice()
           .sort((a, b) => a.bbox.x - b.bbox.x)
           .map(g => g.text)
           .join("");
 
-        const bbox = bboxFromGlyphs(bucket.glyphs);
+        const bbox = bboxFromTextItems(bucket.items);
 
         cells.push({
           rowIndex: r,
@@ -351,7 +351,7 @@ export function extractTableFromGlyphs(
 
   const finalRows = remapRowsWithColumns(trimmedRows, headerFilteredColumns);
 
-  const fullBbox = bboxFromGlyphs(glyphs);
+  const fullBbox = bboxFromTextItems(items);
 
   return {
     pageIndex,
@@ -361,13 +361,13 @@ export function extractTableFromGlyphs(
 }
 
 function getLogicalColumnIndices(
-  buckets: { glyphs: Glyph[] }[][]
+  buckets: { items: TextItem[] }[][]
 ): number[] | null {
   if (buckets.length === 0) return null;
 
   // Count non-empty cells per row
   const nonEmptyCounts = buckets.map(
-    row => row.filter(b => b.glyphs.length > 0).length
+    row => row.filter(b => b.items.length > 0).length
   );
 
   const maxNonEmpty = Math.max(...nonEmptyCounts);
@@ -378,7 +378,7 @@ function getLogicalColumnIndices(
 
   const logicalCols: number[] = [];
   templateRow.forEach((bucket, idx) => {
-    if (bucket.glyphs.length > 0) {
+    if (bucket.items.length > 0) {
       logicalCols.push(idx);
     }
   });
@@ -392,7 +392,7 @@ function getLogicalColumnIndices(
 }
 
 function getFrequentlyUsedColumnIndices(
-  buckets: { glyphs: Glyph[] }[][]
+  buckets: { items: TextItem[] }[][]
 ): number[] | null {
   if (buckets.length === 0) return null;
   const numCols = buckets[0].length;
@@ -400,10 +400,10 @@ function getFrequentlyUsedColumnIndices(
 
   const colUsage = new Array<number>(numCols).fill(0);
 
-  // Count in how many rows each column has any glyphs
+  // Count in how many rows each column has any items
   for (const row of buckets) {
     row.forEach((bucket, colIdx) => {
-      if (bucket.glyphs.length > 0) {
+      if (bucket.items.length > 0) {
         colUsage[colIdx]++;
       }
     });
@@ -541,28 +541,28 @@ function isDateLike(value: string): boolean {
 
 /**
  * Header-guided extraction that matches provided column headers first,
- * then assigns body glyphs to those columns top-down. Falls back to the
+ * then assigns body items to those columns top-down. Falls back to the
  * default detector when it cannot confidently build the table.
  */
 function extractTableWithHeaders(
   pageIndex: number,
-  glyphs: Glyph[],
+  items: TextItem[],
   options: TableExtractionOptions
 ): ParsedTable | null {
-  const nonSpaceGlyphs = glyphs.filter(g => g.text.trim() !== "");
-  if (nonSpaceGlyphs.length === 0) return null;
+  const nonSpaceTextItems = items.filter(g => g.text.trim() !== "");
+  if (nonSpaceTextItems.length === 0) return null;
 
   const headers = options.columnHeaders ?? [];
   if (headers.length === 0) return null;
 
-  // const sortedGlyphs = [...nonSpaceGlyphs].sort((a, b) => {
+  // const sortedTextItems = [...nonSpaceTextItems].sort((a, b) => {
   //   const dx = a.bbox.x - b.bbox.x;
   //   if (Math.abs(dx) > 0.001) return dx;
   //   return -1 * (a.bbox.y - b.bbox.y);
   // });
-  const sortedGlyphs = [...nonSpaceGlyphs];
+  const sortedTextItems = [...nonSpaceTextItems];
 
-  const used = new Set<Glyph>();
+  const used = new Set<TextItem>();
   const headerCells: { title: string; bbox: Rect }[] = [];
 
   for (let headerIdx = 0; headerIdx < headers.length; headerIdx++) {
@@ -573,7 +573,7 @@ function extractTableWithHeaders(
     let headerBBox: Rect | null = null;
 
     for (const part of parts) {
-      const match = sortedGlyphs.find(g => !used.has(g) && g.text.trim() === part);
+      const match = sortedTextItems.find(g => !used.has(g) && g.text.trim() === part);
       if (!match) {
         return null; // missing header part, give up so we can fall back
       }
@@ -590,7 +590,7 @@ function extractTableWithHeaders(
   // Sort headers left-to-right
   headerCells.sort((a, b) => a.bbox.x - b.bbox.x);
 
-  // Track column bands that can expand as we assign body glyphs
+  // Track column bands that can expand as we assign body items
   const columns = headerCells.map(cell => ({
     title: cell.title,
     start: cell.bbox.x,
@@ -601,8 +601,8 @@ function extractTableWithHeaders(
     ...headerCells.map(h => h.bbox.y + h.bbox.height)
   );
 
-  // Body glyphs start below header
-  const bodyGlyphs = nonSpaceGlyphs
+  // Body items start below header
+  const bodyTextItems = nonSpaceTextItems
     .filter(g => g.bbox.y + g.bbox.height <= headerBottom + 0.1)
     .sort((a, b) => {
       // higher y first (closer to header)
@@ -614,17 +614,17 @@ function extractTableWithHeaders(
   const yTolerance = options.yTolerance ?? 3;
   const endWhitespace = options.endOfTableWhitespace ?? Infinity;
 
-  type Bucket = { glyphs: Glyph[]; bbox: Rect };
+  type Bucket = { items: TextItem[]; bbox: Rect };
   const rowsBuckets: Bucket[][] = [];
 
   let lastRowBottom = headerBottom;
-  for (const glyph of bodyGlyphs) {
+  for (const item of bodyTextItems) {
     const overlaps = columns
       .map((col, idx) => ({
         idx,
         overlap:
-          Math.min(col.end, glyph.bbox.x + glyph.bbox.width) -
-          Math.max(col.start, glyph.bbox.x),
+          Math.min(col.end, item.bbox.x + item.bbox.width) -
+          Math.max(col.start, item.bbox.x),
       }))
       .filter(o => o.overlap > 0);
 
@@ -637,8 +637,8 @@ function extractTableWithHeaders(
 
     const colIdx = overlaps[0].idx;
 
-    // Decide which row to place this glyph in
-    const cy = glyph.bbox.y + glyph.bbox.height / 2;
+    // Decide which row to place this item in
+    const cy = item.bbox.y + item.bbox.height / 2;
     let targetRowIdx = rowsBuckets.length - 1;
     const prevRow = rowsBuckets[targetRowIdx]?.[0]?.bbox;
     if (
@@ -647,7 +647,7 @@ function extractTableWithHeaders(
         cy < prevRow.y - yTolerance) // moved down sufficiently -> new row (y decreases downward)
     ) {
       // End-of-table whitespace check
-      const gap = prevRow ? prevRow.y - (glyph.bbox.y + glyph.bbox.height) : 0;
+      const gap = prevRow ? prevRow.y - (item.bbox.y + item.bbox.height) : 0;
       if (prevRow && gap > endWhitespace) {
         break;
       }
@@ -655,22 +655,22 @@ function extractTableWithHeaders(
       // start new row
       rowsBuckets.push(
         columns.map(() => ({
-          glyphs: [],
-          bbox: { x: glyph.bbox.x, y: glyph.bbox.y, width: glyph.bbox.width, height: glyph.bbox.height },
+          items: [],
+          bbox: { x: item.bbox.x, y: item.bbox.y, width: item.bbox.width, height: item.bbox.height },
         }))
       );
       targetRowIdx = rowsBuckets.length - 1;
     }
 
     const bucket = rowsBuckets[targetRowIdx][colIdx];
-    bucket.glyphs.push(glyph);
-    bucket.bbox = unionRects(bucket.bbox, glyph.bbox);
+    bucket.items.push(item);
+    bucket.bbox = unionRects(bucket.bbox, item.bbox);
 
-    // Expand column boundaries to include the glyph
-    columns[colIdx].start = Math.min(columns[colIdx].start, glyph.bbox.x);
-    columns[colIdx].end = Math.max(columns[colIdx].end, glyph.bbox.x + glyph.bbox.width);
+    // Expand column boundaries to include the item
+    columns[colIdx].start = Math.min(columns[colIdx].start, item.bbox.x);
+    columns[colIdx].end = Math.max(columns[colIdx].end, item.bbox.x + item.bbox.width);
 
-    lastRowBottom = Math.min(lastRowBottom, glyph.bbox.y);
+    lastRowBottom = Math.min(lastRowBottom, item.bbox.y);
   }
 
   if (rowsBuckets.length === 0) return null;
@@ -678,10 +678,10 @@ function extractTableWithHeaders(
   const rows: TableRow[] = rowsBuckets.map((rowBuckets, rowIdx) => {
     const cells: TableCell[] = columns.map((_, colIdx) => {
       const bucket = rowBuckets[colIdx];
-      if (bucket.glyphs.length === 0) {
+      if (bucket.items.length === 0) {
         return { rowIndex: rowIdx, columnIndex: colIdx, text: "", bbox: null };
       }
-      const text = bucket.glyphs
+      const text = bucket.items
         .slice()
         .sort((a, b) => a.bbox.x - b.bbox.x)
         .map(g => g.text)

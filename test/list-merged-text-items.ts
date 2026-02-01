@@ -7,22 +7,25 @@ function fmt(n: number): string {
 }
 
 async function main() {
-  const filePath = process.argv[2];
-  if (!filePath) {
-    console.error("Usage: node dist/test/list-glyphs.js <path-to-pdf>");
-    process.exit(1);
-  }
-
+  const filePath = process.argv[2] ?? "test-data/Engie_EASY_Vast.pdf";
   const resolvedPath = path.resolve(filePath);
   console.log(`Reading PDF: ${resolvedPath}`);
 
   const buf = readFileSync(resolvedPath);
-  const pages = await loadTextItemsFromPdf(Uint8Array.from(buf).buffer);
+  const pages = await loadTextItemsFromPdf(Uint8Array.from(buf).buffer, {
+    merge: true,
+    ignoreWhitespace: true,
+    mergeOptions: {
+      horizontalMergeGap: 10,
+      verticalMergeGap: 3,
+      spaceWidth: 2.5,
+    },
+  });
 
   pages.forEach(page => {
     console.log(`\n=== Page ${page.pageIndex} ===`);
     const sorted = [...page.items].sort((a, b) => {
-      const yDiff = b.bbox.y - a.bbox.y; // top to bottom
+      const yDiff = b.bbox.y - a.bbox.y;
       if (Math.abs(yDiff) > 0.001) return yDiff;
       return a.bbox.x - b.bbox.x;
     });
@@ -39,6 +42,6 @@ async function main() {
 }
 
 main().catch(err => {
-  console.error("Error while listing text items:", err);
+  console.error("Error while listing merged text items:", err);
   process.exit(1);
 });

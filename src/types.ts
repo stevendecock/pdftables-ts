@@ -5,7 +5,7 @@ export interface Rect {
   height: number;
 }
 
-export interface Glyph {
+export interface TextItem {
   text: string;
   bbox: Rect;
 }
@@ -37,7 +37,7 @@ export interface TableExtractionOptions {
   decimalSeparator?: string; // default: "."
 
   // Optional explicit column headers to guide detection.
-  // Each string is matched to glyph text (trimmed). Newlines split into multiple glyphs that are combined.
+  // Each string is matched to text item content (trimmed). Newlines split into multiple items that are combined.
   // When provided, the detector will attempt a header-guided extraction first before falling back.
   columnHeaders?: string[];
 

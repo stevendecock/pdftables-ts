@@ -1,5 +1,8 @@
-import { loadGlyphsFromPdf } from "./pdf-loader.js";
-import { extractTableFromGlyphs } from "./table-detector.js";
+import { loadTextItemsFromPdf } from "./pdf-loader.js";
+import { extractTableFromTextItems } from "./table-detector.js";
+export { loadTextItemsFromPdf, type PageTextItems } from "./pdf-loader.js";
+export { PdfTraverser, TextItemTraverser } from "./pdf-traverser.js";
+export type { TextItemPointer } from "./pdf-traverser.js";
 import type {
   ParsedTable,
   TableExtractionOptions,
@@ -15,11 +18,11 @@ export class PdfTableExtractor implements PdfTableExtractorApi {
     buffer: ArrayBuffer,
     options: TableExtractionOptions = {}
   ): Promise<ParsedTable[]> {
-    const pages = await loadGlyphsFromPdf(buffer);
+    const pages = await loadTextItemsFromPdf(buffer);
     const pageTables: ParsedTable[] = [];
 
     for (const page of pages) {
-      const table = extractTableFromGlyphs(page.pageIndex, page.glyphs, options);
+      const table = extractTableFromTextItems(page.pageIndex, page.items, options);
       if (table) pageTables.push(table);
     }
 

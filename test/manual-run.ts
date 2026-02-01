@@ -1,6 +1,6 @@
 import { readFileSync } from "fs";
 import path from "path";
-import { PdfTableExtractor } from "../src/index.js";  // <— this is fine in TS
+import { PdfTableExtractor, TableExtractionOptions } from "../src/index.js";  // <— this is fine in TS
 
 async function main() {
   const filePath = process.argv[2];
@@ -17,20 +17,22 @@ async function main() {
   const makeArrayBuffer = () => Uint8Array.from(buf).buffer;
 
   const extractor = new PdfTableExtractor();
-  const options = {
+  const options:TableExtractionOptions  = {
     xTolerance: 4,
     yTolerance: 4,
+    minColumnCount: 1,
+    maxColumnCount: 1,
+    endOfTableWhitespace: 20,
+    decimalSeparator: ",",
     columnHeaders: [
-          "Maand",
-          "Endex\n101\n(€/MWh)",
-          "Endex\n103\n(€/MWh)",
+          "vergoeding",
         ],
   };
 
   const tables = await extractor.extractTables(makeArrayBuffer(), options);
 
   if (tables.length === 0) {
-    console.log("No tables found (or no glyphs).");
+    console.log("No tables found (or no text items).");
     return;
   }
 

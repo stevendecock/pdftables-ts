@@ -1,4 +1,4 @@
-import type { Glyph } from "./types.js";
+import type { TextItem } from "./types.js";
 
 export function clusterPositions(positions: number[], tolerance: number): number[] {
   if (positions.length === 0) return [];
@@ -29,13 +29,13 @@ export function clusterPositions(positions: number[], tolerance: number): number
   return bands;
 }
 
-export function inferColumns(glyphs: Glyph[], xTolerance: number): number[] {
-  const centers = glyphs.map(g => g.bbox.x + g.bbox.width / 2);
+export function inferColumns(items: TextItem[], xTolerance: number): number[] {
+  const centers = items.map(item => item.bbox.x + item.bbox.width / 2);
   return clusterPositions(centers, xTolerance);
 }
 
-export function inferRows(glyphs: Glyph[], yTolerance: number): number[] {
-  const centers = glyphs.map(g => g.bbox.y + g.bbox.height / 2);
+export function inferRows(items: TextItem[], yTolerance: number): number[] {
+  const centers = items.map(item => item.bbox.y + item.bbox.height / 2);
   const bands = clusterPositions(centers, yTolerance);
   return bands.sort((a, b) => b - a); // top row first
 }

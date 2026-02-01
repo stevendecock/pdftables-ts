@@ -10,5 +10,10 @@
     "esModuleInterop": true,
     "skipLibCheck": true
   },
-  "include": ["src/**/*", "test/manual-run.ts", "test/list-glyphs.ts"]
+  "include": [
+    "src/**/*",
+    "test/manual-run.ts",
+    "test/list-glyphs.ts",
+    "test/list-merged-text-items.ts"
+  ]
 }
