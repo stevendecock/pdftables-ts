@@ -26,6 +26,8 @@ export interface LoadTextItemsOptions {
     xTolerance?: number;
     /** Vertical alignment tolerance used for horizontal merges. */
     yTolerance?: number;
+    /** Prefer horizontal merges over vertical merges when both are possible. Default: true. */
+    preferHorizontal?: boolean;
     /**
      * When merging horizontally, insert one space per spaceWidth of gap.
      * For example, a gap of 5 with spaceWidth 2.5 yields two spaces.
@@ -49,6 +51,7 @@ export async function loadTextItemsFromPdf(
   const verticalMergeGap = mergeOptions.verticalMergeGap ?? 0;
   const xTolerance = mergeOptions.xTolerance ?? 0;
   const yTolerance = mergeOptions.yTolerance ?? 0;
+  const preferHorizontal = mergeOptions.preferHorizontal ?? true;
   const spaceWidth = mergeOptions.spaceWidth ?? 0;
 
   for (let pageIndex = 0; pageIndex < pdf.numPages; pageIndex++) {
@@ -85,6 +88,7 @@ export async function loadTextItemsFromPdf(
             verticalMergeGap,
             xTolerance,
             yTolerance,
+            preferHorizontal,
             spaceWidth
           )
         : items;
@@ -106,44 +110,53 @@ function mergeTextItems(
   verticalMergeGap: number,
   xTolerance: number,
   yTolerance: number,
+  preferHorizontal: boolean,
   spaceWidth: number
 ): TextItem[] {
   if (items.length === 0) return [];
 
   const working: TextItem[] = items.map(item => ({ ...item, bbox: { ...item.bbox } }));
 
-  while (true) {
-    const candidate = findBestMergeCandidate(
+  if (preferHorizontal) {
+    mergePass(
       working,
+      "horizontal",
       horizontalMergeGap,
       verticalMergeGap,
       xTolerance,
-      yTolerance
+      yTolerance,
+      spaceWidth
     );
-    if (!candidate) break;
-
-    const { aIndex, bIndex, direction, gap } = candidate;
-    const a = working[aIndex];
-    const b = working[bIndex];
-    const joiner =
-      direction === "vertical"
-        ? "\n"
-        : spaceWidth > 0 && gap >= spaceWidth
-        ? " ".repeat(Math.max(1, Math.floor(gap / spaceWidth)))
-        : "";
-
-    const mergedText = `${a.text}${joiner}${b.text}`;
-    const mergedItem: TextItem = {
-      text: mergedText,
-      bbox: unionRects(a.bbox, b.bbox),
-    };
-
-    const first = Math.min(aIndex, bIndex);
-    const second = Math.max(aIndex, bIndex);
-    working.splice(second, 1);
-    working.splice(first, 1, mergedItem);
+    mergePass(
+      working,
+      "vertical",
+      horizontalMergeGap,
+      verticalMergeGap,
+      xTolerance,
+      yTolerance,
+      spaceWidth
+    );
+    mergePass(
+      working,
+      "horizontal",
+      horizontalMergeGap,
+      verticalMergeGap,
+      xTolerance,
+      yTolerance,
+      spaceWidth
+    );
+    return working;
   }
 
+  mergePass(
+    working,
+    "any",
+    horizontalMergeGap,
+    verticalMergeGap,
+    xTolerance,
+    yTolerance,
+    spaceWidth
+  );
   return working;
 }
 
@@ -186,9 +199,13 @@ function findBestMergeCandidate(
   horizontalMergeGap: number,
   verticalMergeGap: number,
   xTolerance: number,
-  yTolerance: number
+  yTolerance: number,
+  preferHorizontal: boolean
 ): { aIndex: number; bIndex: number; direction: "horizontal" | "vertical"; gap: number } | null {
   let best: { aIndex: number; bIndex: number; direction: "horizontal" | "vertical"; gap: number } | null = null;
+  let bestHorizontal: { aIndex: number; bIndex: number; direction: "horizontal" | "vertical"; gap: number } | null = null;
+  let bestVertical: { aIndex: number; bIndex: number; direction: "horizontal" | "vertical"; gap: number } | null = null;
+  const overlapEpsilon = 1e-6;
 
   for (let i = 0; i < items.length; i++) {
     for (let j = 0; j < items.length; j++) {
@@ -197,32 +214,82 @@ function findBestMergeCandidate(
       const b = items[j];
 
       if (horizontalMergeGap > 0 && isAlignedHorizontal(a.bbox, b.bbox, yTolerance)) {
-        const gap = b.bbox.x - (a.bbox.x + a.bbox.width);
+        let gap = b.bbox.x - (a.bbox.x + a.bbox.width);
+        if (gap < 0 && gap > -overlapEpsilon) gap = 0;
         if (gap >= 0 && gap <= horizontalMergeGap) {
-          best = chooseBetterCandidate(best, {
+          const candidate: { aIndex: number; bIndex: number; direction: "horizontal" | "vertical"; gap: number } = {
             aIndex: i,
             bIndex: j,
             direction: "horizontal",
             gap,
-          });
+          };
+          best = chooseBetterCandidate(best, candidate);
+          bestHorizontal = chooseBetterCandidate(bestHorizontal, candidate);
         }
       }
 
       if (verticalMergeGap > 0 && isAlignedVertical(a.bbox, b.bbox, xTolerance)) {
-        const gap = a.bbox.y - (b.bbox.y + b.bbox.height);
+        let gap = a.bbox.y - (b.bbox.y + b.bbox.height);
+        if (gap < 0 && gap > -overlapEpsilon) gap = 0;
         if (gap >= 0 && gap <= verticalMergeGap) {
-          best = chooseBetterCandidate(best, {
+          const candidate: { aIndex: number; bIndex: number; direction: "horizontal" | "vertical"; gap: number } = {
             aIndex: i,
             bIndex: j,
             direction: "vertical",
             gap,
-          });
+          };
+          best = chooseBetterCandidate(best, candidate);
+          bestVertical = chooseBetterCandidate(bestVertical, candidate);
         }
       }
     }
   }
 
-  return best;
+  if (!preferHorizontal) return best;
+  return bestHorizontal ?? bestVertical;
+}
+
+function mergePass(
+  working: TextItem[],
+  directionMode: "horizontal" | "vertical" | "any",
+  horizontalMergeGap: number,
+  verticalMergeGap: number,
+  xTolerance: number,
+  yTolerance: number,
+  spaceWidth: number
+): void {
+  while (true) {
+    const candidate = findBestMergeCandidate(
+      working,
+      directionMode === "horizontal" ? horizontalMergeGap : 0,
+      directionMode === "vertical" ? verticalMergeGap : 0,
+      xTolerance,
+      yTolerance,
+      directionMode === "any"
+    );
+    if (!candidate) break;
+
+    const { aIndex, bIndex, direction, gap } = candidate;
+    const a = working[aIndex];
+    const b = working[bIndex];
+    const joiner =
+      direction === "vertical"
+        ? "\n"
+        : spaceWidth > 0 && gap >= spaceWidth
+        ? " ".repeat(Math.max(1, Math.floor(gap / spaceWidth)))
+        : "";
+
+    const mergedText = `${a.text}${joiner}${b.text}`;
+    const mergedItem: TextItem = {
+      text: mergedText,
+      bbox: unionRects(a.bbox, b.bbox),
+    };
+
+    const first = Math.min(aIndex, bIndex);
+    const second = Math.max(aIndex, bIndex);
+    working.splice(second, 1);
+    working.splice(first, 1, mergedItem);
+  }
 }
 
 function chooseBetterCandidate(

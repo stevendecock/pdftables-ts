@@ -100,4 +100,47 @@ describe("PdfTraverser DSL", () => {
     20000
   );
 
+  test(
+    "Navigates to the first 'Formules' section in Engie_FLOW_Variabel_Wallonie.pdf.",
+    async () => {
+      const pdfPath = path.resolve("test-data", "Engie_FLOW_Variabel_Wallonie.pdf");
+      const buf = readFileSync(pdfPath);
+      const arrayBuffer = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+
+      const traverser = await PdfTraverser.fromPdfBuffer(arrayBuffer);
+      const secondFormulas = (await traverser.findNth(
+          "- Enkelvoudig = ", 1, { match: "startsWith" }
+        ))
+        .text();
+
+      expect(secondFormulas).toBe("- Enkelvoudig = 0,0300 + (0,0499 x EPEXDAM)\n" 
+        + "- Tweevoudig piekuren = 0,0300 + (0,0499 x EPEXDAM)\n"
+        + "- Tweevoudig daluren = 0,0300 + (0,0499 x EPEXDAM)\n"
+        + "Het resultaat van deze formules is een bedrag uitgedrukt in c€/kWh.");
+    },
+    20000
+  );
+
+  test(
+    "Navigates to the second 'Formules' section in Engie_FLOW_Variabel_Wallonie.pdf.",
+    async () => {
+      const pdfPath = path.resolve("test-data", "Engie_FLOW_Variabel_Wallonie.pdf");
+      const buf = readFileSync(pdfPath);
+      const arrayBuffer = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+
+      const traverser = await PdfTraverser.fromPdfBuffer(arrayBuffer);
+      const secondFormulas = (await traverser.findNth(
+          "- Enkelvoudig = ", 2, { match: "startsWith" }
+        ))
+        .text();
+
+      expect(secondFormulas).toBe("- Enkelvoudig = 2,4207 + (0,1187 x EPEXDAM)\n" 
+        + "- Tweevoudig piekuren = 2,4307 + (0,1319 x EPEXDAM)\n"
+        + "- Tweevoudig daluren = 2,3937 + (0,0989 x EPEXDAM)\n"
+        + "- Uitsluitend nacht = 2,3937 + (0,0989 x EPEXDAM)\n"
+        + "Het resultaat van deze formules is een bedrag uitgedrukt in c€/kWh.");
+    },
+    20000
+  );
+
 });
