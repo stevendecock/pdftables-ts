@@ -31,13 +31,13 @@ export interface MoveOptions {
   maxDistance?: number;
   /** Minimum distance to consider (default: 0). */
   minDistance?: number;
-  /** For vertical moves, require candidate center to be within this x distance. */
+  /** For vertical moves, require candidate center to be within this x distance (default: 10). */
   xTolerance?: number;
-  /** For horizontal moves, require candidate center to be within this y distance. */
+  /** For horizontal moves, require candidate center to be within this y distance (default: 10). */
   yTolerance?: number;
   /** Only search within the current page (default: true). */
   samePageOnly?: boolean;
-  /** Require overlapping projections on the perpendicular axis. */
+  /** Require overlapping projections on the perpendicular axis (default: true). */
   requireOverlap?: boolean;
   /** Additional predicate to filter candidates. */
   filter?: (item: TextItem, pointer: TextItemPointer) => boolean;
@@ -334,6 +334,9 @@ function findNextPointer(
   const maxDistance = options.maxDistance;
   const metric = options.metric ?? "axis";
   const pageGap = options.pageGap ?? 10000;
+  const xTolerance = options.xTolerance ?? 10;
+  const yTolerance = options.yTolerance ?? 10;
+  const requireOverlap = options.requireOverlap ?? true;
 
   const candidates: Array<{
     pointer: TextItemPointer;
@@ -362,7 +365,12 @@ function findNextPointer(
         direction,
         currentItem.bbox,
         item.bbox,
-        options
+        {
+          ...options,
+          xTolerance,
+          yTolerance,
+          requireOverlap,
+        }
       );
       if (!withinPerpendicular) continue;
 
@@ -387,17 +395,11 @@ function findNextPointer(
 
   if (candidates.length === 0) return null;
 
-  const verticalMove = direction === "up" || direction === "down";
   candidates.sort((a, b) => {
     if (a.pagePenalty !== b.pagePenalty) return a.pagePenalty - b.pagePenalty;
-    if (verticalMove) {
-      if (a.perpendicular !== b.perpendicular) return a.perpendicular - b.perpendicular;
-      if (a.primary !== b.primary) return a.primary - b.primary;
-    } else {
-      if (a.perpendicular !== b.perpendicular) return a.perpendicular - b.perpendicular;
-      if (a.primary !== b.primary) return a.primary - b.primary;
-    }
-    return a.distance - b.distance;
+    if (a.distance !== b.distance) return a.distance - b.distance;
+    if (a.perpendicular !== b.perpendicular) return a.perpendicular - b.perpendicular;
+    return a.primary - b.primary;
   });
 
   return candidates[0].pointer;
