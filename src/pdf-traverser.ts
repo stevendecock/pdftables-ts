@@ -101,9 +101,25 @@ export class PdfTraverser {
     query: TextItemQuery,
     options: FindTextItemOptions = {}
   ): Promise<TextItemTraverser> {
+    return this.findNth(query, 1, options);
+  }
+
+  /**
+   * Find the Nth matching text item (1-based) and return a TextItemTraverser focused on it.
+   * Throws if no match is found.
+   */
+  async findNth(
+    query: TextItemQuery,
+    index: number,
+    options: FindTextItemOptions = {}
+  ): Promise<TextItemTraverser> {
+    if (!Number.isInteger(index) || index < 1) {
+      throw new Error("Index must be an integer greater than or equal to 1.");
+    }
+
     const pages = await this.ensurePages();
     const matcher = buildMatcher(query, options);
-    const pointer = findFirstMatch(pages, matcher, options);
+    const pointer = findNthMatch(pages, matcher, index, options);
 
     if (!pointer) {
       throw new Error("No text item matched the query.");
@@ -237,13 +253,15 @@ function buildMatcher(
   };
 }
 
-function findFirstMatch(
+function findNthMatch(
   pages: PageTextItems[],
   matcher: (item: TextItem, pointer: TextItemPointer) => boolean,
+  index: number,
   options: FindTextItemOptions
 ): TextItemPointer | null {
   const includeWhitespace = options.includeWhitespace ?? false;
   const direction = options.direction ?? "forward";
+  let matchCount = 0;
 
   if (typeof options.pageIndex === "number") {
     const page = pages[options.pageIndex];
@@ -252,7 +270,10 @@ function findFirstMatch(
     for (const entry of sorted) {
       if (!includeWhitespace && entry.item.text.trim() === "") continue;
       const pointer = { pageIndex: options.pageIndex, itemIndex: entry.index };
-      if (matcher(entry.item, pointer)) return pointer;
+      if (matcher(entry.item, pointer)) {
+        matchCount += 1;
+        if (matchCount === index) return pointer;
+      }
     }
     return null;
   }
@@ -275,7 +296,10 @@ function findFirstMatch(
     for (const entry of sorted) {
       if (!includeWhitespace && entry.item.text.trim() === "") continue;
       const pointer = { pageIndex, itemIndex: entry.index };
-      if (matcher(entry.item, pointer)) return pointer;
+      if (matcher(entry.item, pointer)) {
+        matchCount += 1;
+        if (matchCount === index) return pointer;
+      }
     }
   }
 
